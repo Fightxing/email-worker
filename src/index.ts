@@ -22,6 +22,7 @@ import {
   formatConversationTree,
   saveEmail,
 } from './conversation-tree';
+import { addLog } from './log-buffer';
 
 export default {
   /**
@@ -41,6 +42,9 @@ export default {
       const allowedSenders = getAllowedSenders(env);
       if (!isAllowed(message.from, allowedSenders)) {
         console.log(`[REJECT] 发件人不在白名单: ${message.from}`);
+        addLog('email_rejected', `发件人不在白名单: ${message.from}`, {
+          metadata: { from: message.from },
+        });
         message.setReject('Address not allowed');
         return;
       }
@@ -54,6 +58,14 @@ export default {
       console.log(
         `[PARSED] 主题: ${parsed.subject}, 附件: ${parsed.attachments.length} 个, Message-ID: ${parsed.messageId}`,
       );
+      addLog('email_accepted', `来自 ${parsed.from} — "${parsed.subject}"`, {
+        metadata: {
+          from: parsed.from,
+          subject: parsed.subject,
+          messageId: parsed.messageId,
+          attachmentCount: parsed.attachments.length,
+        },
+      });
 
       // ============================================
       // 3. 查询对话树上下文
@@ -93,16 +105,53 @@ export default {
       // ============================================
       const aiConfig = getAIConfig(env);
       console.log(`[AI] 调用模型: ${aiConfig.model}`);
-      const replyText = await generateReply(messages, aiConfig);
-      console.log(`[AI] 生成回复 (${replyText.length} 字符)`);
+      const aiStart = Date.now();
+      let replyText: string;
+      try {
+        replyText = await generateReply(messages, aiConfig);
+        const aiDuration = Date.now() - aiStart;
+        console.log(`[AI] 生成回复 (${replyText.length} 字符, ${aiDuration}ms)`);
+        addLog('ai_reply', `AI 回复生成成功 (${replyText.length} 字符)`, {
+          detail: replyText,
+          durationMs: aiDuration,
+          metadata: { model: aiConfig.model },
+        });
+      } catch (aiError) {
+        const aiDuration = Date.now() - aiStart;
+        const errMsg = aiError instanceof Error ? aiError.message : String(aiError);
+        console.error(`[AI] 调用失败 (${aiDuration}ms): ${errMsg}`);
+        addLog('ai_error', `AI 调用失败: ${errMsg}`, {
+          durationMs: aiDuration,
+          metadata: { model: aiConfig.model },
+        });
+        throw aiError;
+      }
 
       // ============================================
       // 7. 通过 Resend 发送回复
       // ============================================
-      await sendReply(parsed, replyText, env);
-      console.log(
-        `[SENT] 回复已发送至 ${parsed.from}`,
-      );
+      const resendStart = Date.now();
+      try {
+        await sendReply(parsed, replyText, env);
+        const resendDuration = Date.now() - resendStart;
+        console.log(
+          `[SENT] 回复已发送至 ${parsed.from} (${resendDuration}ms)`,
+        );
+        addLog('resend_sent', `回复已发送至 ${parsed.from}`, {
+          durationMs: resendDuration,
+          metadata: { to: parsed.from, subject: `Re: ${parsed.subject}` },
+        });
+      } catch (resendError) {
+        const resendDuration = Date.now() - resendStart;
+        const errMsg =
+          resendError instanceof Error ? resendError.message : String(resendError);
+        console.error(`[SENT] 发送失败 (${resendDuration}ms): ${errMsg}`);
+        addLog('resend_error', `Resend 发送失败: ${errMsg}`, {
+          durationMs: resendDuration,
+          metadata: { to: parsed.from },
+        });
+        throw resendError;
+      }
 
       // ============================================
       // 8. 将当前邮件保存到 D1 对话树
@@ -112,6 +161,9 @@ export default {
       const errorMessage =
         error instanceof Error ? error.message : String(error);
       console.error(`[ERROR] 处理邮件失败: ${errorMessage}`);
+      addLog('system', `处理邮件失败: ${errorMessage}`, {
+        metadata: { from: message.from },
+      });
 
       // 不抛出错误，避免 Worker 崩溃
     }

@@ -4,6 +4,7 @@
 
 import type { Env } from './types';
 import { readPrompts } from './config';
+import { getLogs, clearLogs } from './log-buffer';
 
 // ---- KV 键名常量 ----
 const KV_KEYS = {
@@ -73,6 +74,17 @@ export async function handleApiRequest(
       senderEmail: env.SENDER_EMAIL || '',
       senderName: env.SENDER_NAME || '',
     });
+  }
+
+  // GET /admin/api/logs — 获取日志列表
+  if (pathname === '/admin/api/logs' && request.method === 'GET') {
+    return jsonResponse(getLogs());
+  }
+
+  // DELETE /admin/api/logs — 清空日志
+  if (pathname === '/admin/api/logs' && request.method === 'DELETE') {
+    clearLogs();
+    return jsonResponse({ success: true });
   }
 
   return jsonResponse({ error: 'Not Found' }, 404);
@@ -305,10 +317,134 @@ export function renderAdminPage(): string {
   }
   .empty-state svg { margin-bottom: 16px; opacity: 0.4; }
 
+  /* ===== 日志面板 ===== */
+  .log-toolbar {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    margin-bottom: 16px;
+  }
+  .auto-refresh-indicator {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 0.8rem;
+    color: var(--text-muted);
+  }
+  .pulse-dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: var(--success);
+    animation: pulse 2s ease-in-out infinite;
+  }
+  @keyframes pulse {
+    0%, 100% { opacity: 1; transform: scale(1); }
+    50% { opacity: 0.4; transform: scale(0.75); }
+  }
+  .log-list {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    max-height: 65vh;
+    overflow-y: auto;
+    padding-right: 4px;
+  }
+  .log-list::-webkit-scrollbar { width: 6px; }
+  .log-list::-webkit-scrollbar-track { background: transparent; }
+  .log-list::-webkit-scrollbar-thumb {
+    background: var(--border);
+    border-radius: 3px;
+  }
+  .log-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-left: 3px solid var(--border);
+    border-radius: 8px;
+    padding: 14px 16px;
+    transition: border-color 0.2s, background 0.2s;
+  }
+  .log-card.type-email_accepted,
+  .log-card.type-resend_sent { border-left-color: var(--success); }
+  .log-card.type-ai_reply { border-left-color: var(--accent); }
+  .log-card.type-email_rejected,
+  .log-card.type-ai_error,
+  .log-card.type-resend_error,
+  .log-card.type-system { border-left-color: var(--danger); }
+  .log-card-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    margin-bottom: 6px;
+  }
+  .log-type-badge {
+    display: inline-block;
+    font-size: 0.7rem;
+    font-weight: 600;
+    padding: 2px 8px;
+    border-radius: 4px;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    white-space: nowrap;
+  }
+  .badge-accepted, .badge-sent { background: rgba(34,197,94,0.12); color: var(--success); }
+  .badge-reply { background: rgba(99,102,241,0.12); color: var(--accent-hover); }
+  .badge-error { background: rgba(239,68,68,0.12); color: var(--danger); }
+  .log-time {
+    font-size: 0.75rem;
+    color: var(--text-muted);
+    white-space: nowrap;
+  }
+  .log-duration {
+    font-size: 0.7rem;
+    color: var(--text-muted);
+    background: rgba(139,143,163,0.1);
+    padding: 1px 6px;
+    border-radius: 4px;
+    white-space: nowrap;
+  }
+  .log-summary {
+    font-size: 0.88rem;
+    color: var(--text);
+    word-break: break-word;
+    margin-bottom: 4px;
+  }
+  .log-card.has-detail { cursor: pointer; }
+  .log-card.has-detail:hover { background: rgba(255,255,255,0.03); }
+  .log-expand-hint {
+    font-size: 0.7rem;
+    color: var(--accent);
+    margin-top: 2px;
+  }
+  .log-detail {
+    display: none;
+    margin-top: 10px;
+    padding: 12px 14px;
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    font-family: 'JetBrains Mono', 'Fira Code', monospace;
+    font-size: 0.8rem;
+    line-height: 1.7;
+    white-space: pre-wrap;
+    word-break: break-word;
+    max-height: 240px;
+    overflow-y: auto;
+  }
+  .log-detail.open { display: block; }
+  .log-meta {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    align-items: center;
+  }
+
   @media (max-width: 640px) {
     .container { padding: 20px 14px; }
     .card { padding: 18px; }
     header { flex-direction: column; align-items: flex-start; gap: 12px; }
+    .log-toolbar { flex-direction: column; align-items: stretch; }
   }
 </style>
 </head>
@@ -324,6 +460,7 @@ export function renderAdminPage(): string {
   <div class="tabs">
     <button class="tab-btn active" data-tab="prompts">&#9881; 提示词管理</button>
     <button class="tab-btn" data-tab="config">&#128269; 配置查看</button>
+    <button class="tab-btn" data-tab="logs">&#128202; 日志监控</button>
   </div>
 
   <!-- Tab: 提示词管理 -->
@@ -380,17 +517,54 @@ export function renderAdminPage(): string {
       </table>
     </div>
   </div>
+
+  <!-- Tab: 日志监控 -->
+  <div class="tab-panel" id="panel-logs">
+    <div class="log-toolbar">
+      <button class="btn btn-primary" id="btn-refresh-logs" onclick="loadLogs()">
+        &#8635; 手动刷新
+      </button>
+      <span class="auto-refresh-indicator" id="auto-refresh-indicator">
+        <span class="pulse-dot"></span> 自动刷新中 (5s)
+      </span>
+    </div>
+    <div class="log-list" id="log-list">
+      <div class="empty-state">
+        <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>
+        <p>暂无日志记录</p>
+        <p style="font-size:0.8rem;margin-top:4px;">当有邮件到达或 API 调用发生时，日志将在此实时显示</p>
+      </div>
+    </div>
+  </div>
 </div>
 
 <script>
   // ===== Tab 切换 =====
+  let autoRefreshTimer = null;
+
+  function stopAutoRefresh() {
+    if (autoRefreshTimer) { clearInterval(autoRefreshTimer); autoRefreshTimer = null; }
+    const indicator = document.getElementById('auto-refresh-indicator');
+    if (indicator) indicator.style.display = 'none';
+  }
+
+  function startAutoRefresh() {
+    stopAutoRefresh();
+    const indicator = document.getElementById('auto-refresh-indicator');
+    if (indicator) indicator.style.display = '';
+    loadLogs();
+    autoRefreshTimer = setInterval(loadLogs, 5000);
+  }
+
   document.querySelectorAll('.tab-btn').forEach(btn => {
     btn.addEventListener('click', () => {
       document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
       document.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('active'));
       btn.classList.add('active');
       document.getElementById('panel-' + btn.dataset.tab).classList.add('active');
+      stopAutoRefresh();
       if (btn.dataset.tab === 'config') loadConfig();
+      if (btn.dataset.tab === 'logs') startAutoRefresh();
     });
   });
 
@@ -491,6 +665,88 @@ export function renderAdminPage(): string {
     const d = document.createElement('div');
     d.textContent = s;
     return d.innerHTML;
+  }
+
+  // ===== 日志渲染 =====
+  const LOG_TYPE_LABELS = {
+    email_accepted: '邮件接收',
+    email_rejected: '白名单拒绝',
+    ai_reply: 'AI 回复',
+    ai_error: 'AI 错误',
+    resend_sent: '发送成功',
+    resend_error: '发送失败',
+    system: '系统',
+  };
+
+  const LOG_BADGE_CLASS = {
+    email_accepted: 'badge-accepted',
+    email_rejected: 'badge-error',
+    ai_reply: 'badge-reply',
+    ai_error: 'badge-error',
+    resend_sent: 'badge-sent',
+    resend_error: 'badge-error',
+    system: 'badge-error',
+  };
+
+  function formatTime(iso) {
+    const d = new Date(iso);
+    const pad = n => String(n).padStart(2, '0');
+    return pad(d.getHours()) + ':' + pad(d.getMinutes()) + ':' + pad(d.getSeconds());
+  }
+
+  async function loadLogs() {
+    const list = document.getElementById('log-list');
+    try {
+      const res = await fetch(location.pathname + 'api/logs' + location.search);
+      if (!res.ok) throw new Error('HTTP ' + res.status);
+      const logs = await res.json();
+
+      if (!logs || logs.length === 0) {
+        list.innerHTML = '<div class="empty-state"><svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg><p>暂无日志记录</p><p style="font-size:0.8rem;margin-top:4px;">当有邮件到达或 API 调用发生时，日志将在此实时显示</p></div>';
+        return;
+      }
+
+      // 倒序渲染（最新在前）
+      const reversed = logs.slice().reverse();
+      list.innerHTML = reversed.map(log => {
+        const hasDetail = !!log.detail;
+        const badgeClass = LOG_BADGE_CLASS[log.type] || 'badge-accepted';
+        const typeLabel = LOG_TYPE_LABELS[log.type] || log.type;
+
+        let metaHtml = '';
+        if (log.metadata && log.metadata.from) {
+          metaHtml += '<span style="font-size:0.75rem;color:var(--text-muted);">' + escapeHtml(String(log.metadata.from)) + '</span>';
+        }
+        if (log.metadata && log.metadata.subject) {
+          metaHtml += '<span style="font-size:0.75rem;color:var(--text-muted);">' + escapeHtml(String(log.metadata.subject)) + '</span>';
+        }
+
+        const durationHtml = log.durationMs != null
+          ? '<span class="log-duration">' + log.durationMs + 'ms</span>'
+          : '';
+
+        return (
+          '<div class="log-card type-' + log.type + (hasDetail ? ' has-detail' : '') + '"' +
+          (hasDetail ? ' onclick="this.querySelector(\'.log-detail\').classList.toggle(\'open\')"' : '') + '>' +
+          '<div class="log-card-header">' +
+          '<span class="log-type-badge ' + badgeClass + '">' + escapeHtml(typeLabel) + '</span>' +
+          '<div style="display:flex;align-items:center;gap:8px;">' +
+          durationHtml +
+          '<span class="log-time">' + formatTime(log.timestamp) + '</span>' +
+          '</div>' +
+          '</div>' +
+          '<div class="log-summary">' + escapeHtml(log.summary) + '</div>' +
+          (metaHtml ? '<div class="log-meta">' + metaHtml + '</div>' : '') +
+          (hasDetail
+            ? '<div class="log-expand-hint">&#9660; 点击展开 AI 回复详情</div>' +
+              '<div class="log-detail">' + escapeHtml(log.detail) + '</div>'
+            : '') +
+          '</div>'
+        );
+      }).join('');
+    } catch (err) {
+      list.innerHTML = '<div class="empty-state"><p style="color:var(--danger);">加载日志失败: ' + escapeHtml(err.message) + '</p></div>';
+    }
   }
 
   // ===== 初始化 =====
