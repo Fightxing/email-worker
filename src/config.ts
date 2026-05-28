@@ -31,7 +31,7 @@ export const SUPPORTED_IMAGE_TYPES = [
 ];
 
 /** AI API 超时时间（毫秒） */
-export const AI_TIMEOUT_MS = 30_000;
+export const AI_TIMEOUT_MS = 300_000;
 
 /** AI API 最大重试次数 */
 export const AI_MAX_RETRIES = 2;
