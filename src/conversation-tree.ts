@@ -233,7 +233,7 @@ function formatNode(
   lines.push(`${indent}正文:`);
 
   // 限制每封邮件的正文长度，避免上下文过长
-  const maxLen = 2000;
+  const maxLen = 12800;
   const body =
     email.text.length > maxLen
       ? email.text.slice(0, maxLen) + '\n...(正文过长，已截断)'
