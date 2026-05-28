@@ -579,7 +579,7 @@ export function renderAdminPage(): string {
   // ===== 加载提示词 =====
   async function loadPrompts() {
     try {
-      const res = await fetch(location.pathname + 'api/prompts' + location.search);
+      const res = await fetch(location.pathname.replace(/\\/?$/, '/') + 'api/prompts' + location.search);
       if (!res.ok) throw new Error('HTTP ' + res.status);
       const data = await res.json();
       document.getElementById('input-system').value = data.systemPrompt || '';
@@ -608,7 +608,7 @@ export function renderAdminPage(): string {
     };
 
     try {
-      const res = await fetch(location.pathname + 'api/prompts' + location.search, {
+      const res = await fetch(location.pathname.replace(/\\/?$/, '/') + 'api/prompts' + location.search, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(body),
@@ -632,7 +632,7 @@ export function renderAdminPage(): string {
     const tbody = document.getElementById('config-body');
     tbody.innerHTML = '<tr><td colspan="2" class="empty-state">加载中...</td></tr>';
     try {
-      const res = await fetch(location.pathname + 'api/config' + location.search);
+      const res = await fetch(location.pathname.replace(/\\/?$/, '/') + 'api/config' + location.search);
       if (!res.ok) throw new Error('HTTP ' + res.status);
       const data = await res.json();
       const rows = [
@@ -697,7 +697,7 @@ export function renderAdminPage(): string {
   async function loadLogs() {
     const list = document.getElementById('log-list');
     try {
-      const res = await fetch(location.pathname + 'api/logs' + location.search);
+      const res = await fetch(location.pathname.replace(/\\/?$/, '/') + 'api/logs' + location.search);
       if (!res.ok) throw new Error('HTTP ' + res.status);
       const logs = await res.json();
 
@@ -727,7 +727,7 @@ export function renderAdminPage(): string {
 
         return (
           '<div class="log-card type-' + log.type + (hasDetail ? ' has-detail' : '') + '"' +
-          (hasDetail ? ' onclick="this.querySelector(\'.log-detail\').classList.toggle(\'open\')"' : '') + '>' +
+          (hasDetail ? ' data-detail-id="' + log.id + '"' : '') + '>' +
           '<div class="log-card-header">' +
           '<span class="log-type-badge ' + badgeClass + '">' + escapeHtml(typeLabel) + '</span>' +
           '<div style="display:flex;align-items:center;gap:8px;">' +
@@ -748,6 +748,14 @@ export function renderAdminPage(): string {
       list.innerHTML = '<div class="empty-state"><p style="color:var(--danger);">加载日志失败: ' + escapeHtml(err.message) + '</p></div>';
     }
   }
+
+  // ===== 日志卡片点击展开（事件委托） =====
+  document.getElementById('log-list').addEventListener('click', function(e) {
+    const card = e.target.closest('.log-card.has-detail');
+    if (!card) return;
+    const detail = card.querySelector('.log-detail');
+    if (detail) detail.classList.toggle('open');
+  });
 
   // ===== 初始化 =====
   loadPrompts();
