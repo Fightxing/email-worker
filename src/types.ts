@@ -10,6 +10,8 @@ export interface Attachment {
   mimeType: string;
   /** Base64 编码的内容（仅图片附件填充） */
   content?: string;
+  /** 文本附件的解码后字符内容（仅文本文件填充） */
+  textContent?: string;
   /** 原始字节大小 */
   size: number;
 }

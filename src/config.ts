@@ -30,6 +30,46 @@ export const SUPPORTED_IMAGE_TYPES = [
   'image/webp',
 ];
 
+/**
+ * 文本附件检测 — 字节探测采样大小（字节）
+ *
+ * 对附件前 N 字节进行可打印字符占比分析，
+ * 避免读取超大文件全文造成 CPU 开销。
+ */
+export const TEXT_PROBE_SIZE = 4096;
+
+/**
+ * 文本附件检测 — 可打印字符占比阈值
+ *
+ * 当采样字节中可打印字符（含常见空白符、UTF-8 多字节序列）
+ * 占比 >= 该值时，判定为文本文件。
+ */
+export const TEXT_DETECTION_THRESHOLD = 0.95;
+
+/**
+ * 文本附件最大字符数
+ *
+ * 文本附件内容在发送给 AI 时，截取前 N 个字符，
+ * 防止超大文本文件撑爆 AI 上下文窗口。
+ */
+export const MAX_TEXT_ATTACHMENT_CHARS = 1000000;
+
+/**
+ * 已知文本 MIME 类型（用于预筛选，减少不必要的字节探测）
+ *
+ * 所有 text/* 类型自动命中，此处列出常见的 application/* 文本类型。
+ */
+export const KNOWN_TEXT_MIME_TYPES = new Set([
+  'application/json',
+  'application/xml',
+  'application/javascript',
+  'application/x-yaml',
+  'application/x-sh',
+  'application/x-httpd-php',
+  'application/x-latex',
+  'application/rtf',
+]);
+
 /** AI API 超时时间（毫秒） */
 export const AI_TIMEOUT_MS = 300_000;
 

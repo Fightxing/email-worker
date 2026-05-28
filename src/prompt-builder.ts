@@ -3,7 +3,7 @@
 // ============================================================
 
 import type { ParsedEmail, AIMessage, AIMessageContent, PromptConfig } from './types';
-import { SUPPORTED_IMAGE_TYPES } from './config';
+import { SUPPORTED_IMAGE_TYPES, MAX_TEXT_ATTACHMENT_CHARS } from './config';
 
 /**
  * 构建发送给 AI 的多模态消息列表（三层提示词 + 对话上下文）
@@ -106,14 +106,34 @@ function buildEmailDescription(email: ParsedEmail): string {
     parts.push(stripHtml(email.html));
   }
 
-  // 非图片附件仅附加文件名作为上下文
+  // 非图片附件处理
   const nonImageAttachments = email.attachments.filter(
     (att) => !SUPPORTED_IMAGE_TYPES.includes(att.mimeType),
   );
-  if (nonImageAttachments.length > 0) {
+
+  // 文本附件：输出内容
+  const textAttachments = nonImageAttachments.filter((att) => att.textContent);
+  if (textAttachments.length > 0) {
+    parts.push('');
+    parts.push('--- 文本附件内容 ---');
+    for (const att of textAttachments) {
+      const truncated =
+        att.textContent!.length > MAX_TEXT_ATTACHMENT_CHARS
+          ? att.textContent!.slice(0, MAX_TEXT_ATTACHMENT_CHARS) +
+            `\n[... 已截断，原始长度 ${att.textContent!.length} 字符]`
+          : att.textContent!;
+      parts.push(`### ${att.filename} (${att.mimeType}, ${formatSize(att.size)})`);
+      parts.push(truncated);
+      parts.push('');
+    }
+  }
+
+  // 非文本、非图片附件：仅列出文件名和大小
+  const binaryAttachments = nonImageAttachments.filter((att) => !att.textContent);
+  if (binaryAttachments.length > 0) {
     parts.push('');
     parts.push('--- 附件列表 ---');
-    for (const att of nonImageAttachments) {
+    for (const att of binaryAttachments) {
       parts.push(`- ${att.filename} (${att.mimeType}, ${formatSize(att.size)})`);
     }
   }
