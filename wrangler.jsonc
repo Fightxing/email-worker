@@ -1,0 +1,23 @@
+{
+  "$schema": "https://raw.githubusercontent.com/cloudflare/workers-sdk/main/packages/wrangler/config-schema.json",
+  "name": "email-worker",
+  "main": "src/index.ts",
+  "compatibility_date": "2025-05-28",
+  "compatibility_flags": ["nodejs_compat"],
+  "kv_namespaces": [
+    {
+      "binding": "PROMPT_KV",
+      "id": "cb134db8269f4c7b8af18a9a1a21b239"
+    }
+  ],
+  "vars": {
+    "AI_BASE_URL": "https://gcli.ggchan.dev/",
+    "AI_MODEL": "gemini-3.1-pro-preview",
+    "SENDER_EMAIL": "bot@sigmund.moe",
+    "SENDER_NAME": "AI Assistant"
+  },
+  "observability": {
+    "enabled": true,
+    "head_sampling_rate": 1
+  }
+}

@@ -1,0 +1,21 @@
+{
+  "name": "email-worker",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Cloudflare Email AI Agent - 自动邮件回复机器人",
+  "scripts": {
+    "deploy": "wrangler deploy",
+    "dev": "wrangler dev",
+    "start": "wrangler dev",
+    "cf-typegen": "wrangler types"
+  },
+  "dependencies": {
+    "postal-mime": "^2.4.0"
+  },
+  "devDependencies": {
+    "@cloudflare/workers-types": "^4.20250524.0",
+    "@types/node": "^22.0.0",
+    "typescript": "^5.7.0",
+    "wrangler": "^4.0.0"
+  }
+}

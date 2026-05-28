@@ -1,0 +1,5 @@
+.dev.vars
+SECRETS.md
+.wrangler/
+node_modules/
+.vscode/
