@@ -138,7 +138,7 @@ export async function getConversationTree(
   // 查询该线程下的所有邮件，按创建时间排序
   const result = await db
     .prepare(
-      `SELECT id, message_id AS messageId, in_reply_to AS inReplyTo, refs AS references,
+      `SELECT id, message_id AS messageId, in_reply_to AS inReplyTo, refs AS "references",
               from_address AS "from", to_address AS "to", subject,
               text_body AS text, thread_root_id AS threadRootId, created_at AS createdAt
        FROM emails WHERE thread_root_id = ? ORDER BY created_at ASC`,
