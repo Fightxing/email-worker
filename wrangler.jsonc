@@ -10,6 +10,13 @@
       "id": "cb134db8269f4c7b8af18a9a1a21b239"
     }
   ],
+  "d1_databases": [
+    {
+      "binding": "EMAIL_DB",
+      "database_name": "email-worker-db",
+      "database_id": "73162bb4-2e33-4a9e-a0a6-de4e5bc32a5b"
+    }
+  ],
   "vars": {
     "AI_BASE_URL": "https://gcli.ggchan.dev/",
     "AI_MODEL": "gemini-3.1-pro-preview",

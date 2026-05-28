@@ -6,19 +6,21 @@ import type { ParsedEmail, AIMessage, AIMessageContent, PromptConfig } from './t
 import { SUPPORTED_IMAGE_TYPES } from './config';
 
 /**
- * 构建发送给 AI 的多模态消息列表（三层提示词）
+ * 构建发送给 AI 的多模态消息列表（三层提示词 + 对话上下文）
  *
  * 消息结构:
  *   [0] system — AI 角色定义 (prompts.systemPrompt)
- *   [1] user   — prePrompt + 邮件内容 + postPrompt + 图片附件
+ *   [1] user   — prePrompt + 对话历史 + 当前邮件 + postPrompt + 图片附件
  *
- * @param email   解析后的邮件
- * @param prompts 三层提示词配置
+ * @param email               当前解析后的邮件
+ * @param prompts             三层提示词配置
+ * @param conversationContext 对话树上下文文本（可选）
  * @returns OpenAI 兼容的 messages 数组
  */
 export function buildMessages(
   email: ParsedEmail,
   prompts: PromptConfig,
+  conversationContext?: string,
 ): AIMessage[] {
   const messages: AIMessage[] = [];
 
@@ -39,14 +41,22 @@ export function buildMessages(
     });
   }
 
-  // 2b. 邮件正文描述
+  // 2b. 对话历史上下文（如果有）
+  if (conversationContext) {
+    userContent.push({
+      type: 'text',
+      text: conversationContext,
+    });
+  }
+
+  // 2c. 当前邮件正文描述
   const emailDescription = buildEmailDescription(email);
   userContent.push({
     type: 'text',
     text: emailDescription,
   });
 
-  // 2c. 正文后指令（postPrompt）
+  // 2d. 正文后指令（postPrompt）
   if (prompts.postPrompt) {
     userContent.push({
       type: 'text',

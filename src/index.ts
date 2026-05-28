@@ -16,6 +16,12 @@ import {
 } from './config';
 import { checkAuth } from './auth';
 import { renderAdminPage, handleApiRequest } from './web-gui';
+import {
+  findThreadRootId,
+  getConversationTree,
+  formatConversationTree,
+  saveEmail,
+} from './conversation-tree';
 
 export default {
   /**
@@ -46,23 +52,44 @@ export default {
       // ============================================
       const parsed = await parseEmail(message.raw, message.rawSize);
       console.log(
-        `[PARSED] 主题: ${parsed.subject}, 附件: ${parsed.attachments.length} 个`,
+        `[PARSED] 主题: ${parsed.subject}, 附件: ${parsed.attachments.length} 个, Message-ID: ${parsed.messageId}`,
       );
 
       // ============================================
-      // 3. 读取三层提示词
+      // 3. 查询对话树上下文
+      // ============================================
+      const threadRootId = await findThreadRootId(
+        env.EMAIL_DB,
+        parsed.inReplyTo,
+        parsed.references,
+      );
+      console.log(`[CONV] 线程根: ${threadRootId || '(新线程)'}`);
+
+      const conversationNodes = await getConversationTree(
+        env.EMAIL_DB,
+        threadRootId || parsed.messageId,
+      );
+      const conversationContext = formatConversationTree(conversationNodes);
+      if (conversationContext) {
+        console.log(
+          `[CONV] 对话历史 (${conversationContext.length} 字符)`,
+        );
+      }
+
+      // ============================================
+      // 4. 读取三层提示词
       // ============================================
       const prompts = await readPrompts(env);
       console.log(`[PROMPT] 三层提示词已加载 (system: ${prompts.systemPrompt.length} 字符, pre: ${prompts.prePrompt.length} 字符, post: ${prompts.postPrompt.length} 字符)`);
 
       // ============================================
-      // 4. 构建 AI messages
+      // 5. 构建 AI messages
       // ============================================
-      const messages = buildMessages(parsed, prompts);
+      const messages = buildMessages(parsed, prompts, conversationContext || undefined);
       console.log(`[BUILD] 构建了 ${messages.length} 条消息`);
 
       // ============================================
-      // 5. 调用 AI 生成回复
+      // 6. 调用 AI 生成回复
       // ============================================
       const aiConfig = getAIConfig(env);
       console.log(`[AI] 调用模型: ${aiConfig.model}`);
@@ -70,12 +97,17 @@ export default {
       console.log(`[AI] 生成回复 (${replyText.length} 字符)`);
 
       // ============================================
-      // 6. 通过 Resend 发送回复
+      // 7. 通过 Resend 发送回复
       // ============================================
       await sendReply(parsed, replyText, env);
       console.log(
         `[SENT] 回复已发送至 ${parsed.from}`,
       );
+
+      // ============================================
+      // 8. 将当前邮件保存到 D1 对话树
+      // ============================================
+      await saveEmail(env.EMAIL_DB, parsed, threadRootId);
     } catch (error) {
       const errorMessage =
         error instanceof Error ? error.message : String(error);

@@ -54,6 +54,7 @@ export async function parseEmail(
     html: parsed.html || '',
     attachments,
     messageId: extractHeader(headers, 'message-id') || '',
+    inReplyTo: extractHeader(headers, 'in-reply-to') || '',
     references: extractHeader(headers, 'references') || '',
   };
 }

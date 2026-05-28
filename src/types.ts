@@ -30,8 +30,42 @@ export interface ParsedEmail {
   attachments: Attachment[];
   /** Message-ID 头（用于 In-Reply-To 线程） */
   messageId: string;
+  /** In-Reply-To 头（指向被回复邮件的 Message-ID） */
+  inReplyTo: string;
   /** References 头（用于保持邮件线程） */
   references: string;
+}
+
+/** 对话树中的单封邮件节点 */
+export interface ConversationEmail {
+  /** 自增 ID */
+  id: number;
+  /** Message-ID 头 */
+  messageId: string;
+  /** In-Reply-To 头 */
+  inReplyTo: string;
+  /** References 头 */
+  references: string;
+  /** 发件人 */
+  from: string;
+  /** 收件人 */
+  to: string;
+  /** 主题 */
+  subject: string;
+  /** 纯文本正文 */
+  text: string;
+  /** 线程根 Message-ID（计算字段） */
+  threadRootId: string;
+  /** 创建时间 */
+  createdAt: string;
+}
+
+/** 对话树节点（用于构建树结构） */
+export interface ConversationNode {
+  /** 当前邮件 */
+  email: ConversationEmail;
+  /** 子节点（回复当前邮件的邮件列表） */
+  children: ConversationNode[];
 }
 
 /** AI API 调用配置 */
@@ -93,6 +127,9 @@ export interface PromptConfig {
 export interface Env {
   // KV 绑定
   PROMPT_KV: KVNamespace;
+
+  // D1 数据库绑定
+  EMAIL_DB: D1Database;
 
   // 环境变量（wrangler.jsonc vars）
   AI_BASE_URL: string;
