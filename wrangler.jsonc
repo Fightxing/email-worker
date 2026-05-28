@@ -21,7 +21,7 @@
     "AI_BASE_URL": "https://gcli.ggchan.dev/",
     "AI_MODEL": "gemini-3.1-pro-preview",
     "SENDER_EMAIL": "bot@sigmund.moe",
-    "SENDER_NAME": "AI Assistant"
+    "SENDER_NAME": "泉此方"
   },
   "observability": {
     "enabled": true,
