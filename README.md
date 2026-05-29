@@ -170,7 +170,7 @@ npm run deploy
 
 部署后访问 `https://<your-worker>/admin?token=<AUTH_TOKEN>` 即可打开管理面板。面板支持：
 
-- **提示词管理**：在线查看和修改三层提示词（system / pre / post），保存后即时生效
+- **提示词管理/预览**：在线查看和修改三层提示词（system / pre / post），预览生成的 JSON 请求，保存后即时生效
 - **配置查看**：查看当前的白名单、AI 模型、发件人等只读配置
 
 ## 技术栈
@@ -181,3 +181,7 @@ npm run deploy
 - **数据存储**：Cloudflare D1 (对话历史) + KV (提示词)
 - **邮件发送**：Resend API
 - **AI 接口**：OpenAI 兼容 API (Chat Completions)
+
+## License
+
+AGPL-3.0 及以上版本。
