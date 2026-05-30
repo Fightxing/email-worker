@@ -77,15 +77,15 @@ export default {
       }
 
       // ============================================
-      // 4. 读取三层提示词
+      // 4. 读取提示词块
       // ============================================
-      const prompts = await readPrompts(env);
-      console.log(`[PROMPT] 三层提示词已加载 (system: ${prompts.systemPrompt.length} 字符, pre: ${prompts.prePrompt.length} 字符, post: ${prompts.postPrompt.length} 字符)`);
+      const blocks = await readPrompts(env);
+      console.log(`[PROMPT] 提示词块已加载 (${blocks.length} 个块, ${blocks.filter(b=>b.enabled).length} 个启用)`);
 
       // ============================================
       // 5. 构建 AI messages
       // ============================================
-      const messages = buildMessages(parsed, prompts, conversationContext || undefined);
+      const messages = buildMessages(parsed, blocks, conversationContext || undefined);
       console.log(`[BUILD] 构建了 ${messages.length} 条消息`);
 
       // ============================================

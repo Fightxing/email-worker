@@ -219,7 +219,7 @@ function utf8SequenceLength(byte: number): number {
  * 使用 UTF-8 解码器，忽略无效字节（不抛异常）。
  */
 function decodeTextAttachment(contentBytes: Uint8Array): string {
-  const decoder = new TextDecoder('utf-8', { fatal: false });
+  const decoder = new TextDecoder('utf-8', { fatal: false, ignoreBOM: true });
   return decoder.decode(contentBytes);
 }
 

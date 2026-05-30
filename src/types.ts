@@ -125,6 +125,47 @@ export interface PromptConfig {
   postPrompt: string;
 }
 
+/** 提示词块 — 可排序的多块提示词系统 */
+export interface PromptBlock {
+  /** 唯一标识 (UUID) */
+  id: string;
+  /** 显示名称 */
+  name: string;
+  /** 消息角色 */
+  role: 'system' | 'user' | 'assistant';
+  /** 模板文本，可含 {{variable}} 占位符 */
+  content: string;
+  /** 是否启用 */
+  enabled: boolean;
+  /** 排序权重（越小越靠前，默认步长 10） */
+  sortOrder: number;
+  /** 是否合并到前一个同 role 消息 */
+  mergeWithPrevious: boolean;
+}
+
+/**
+ * 模板变量键集合
+ *
+ * 构建时可用 {{variable}} 引用以下动态内容：
+ *   {{email_from}}              — 发件人地址
+ *   {{email_to}}                — 收件人地址
+ *   {{email_subject}}           — 邮件主题
+ *   {{email_body}}              — 纯文本正文（优先 text，其次去标签 HTML）
+ *   {{email_text_attachments}}  — 文本附件内容（含文件名/MIME/大小/截断标记）
+ *   {{email_attachment_list}}   — 非文本附件列表（仅文件名/大小）
+ *   {{email_full}}              — 以上全部组合（from + subject + body + attachments）
+ *   {{conversation_context}}    — 对话树上下文
+ */
+export type TemplateVariable =
+  | 'email_from'
+  | 'email_to'
+  | 'email_subject'
+  | 'email_body'
+  | 'email_text_attachments'
+  | 'email_attachment_list'
+  | 'email_full'
+  | 'conversation_context';
+
 /** 环境变量绑定 */
 export interface Env {
   // KV 绑定

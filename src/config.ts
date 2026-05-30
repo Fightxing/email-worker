@@ -2,20 +2,43 @@
 // src/config.ts — 环境变量读取 & 校验
 // ============================================================
 
-import type { AIConfig, Env, PromptConfig } from './types';
+import type { AIConfig, Env, PromptBlock } from './types';
 
-/** 默认系统提示词（当 KV 中无值时使用） */
-export const DEFAULT_SYSTEM_PROMPT = `你是一个友好的 AI 邮件助手。请根据收到的邮件内容，生成简洁、专业、有帮助的回复。
+/** KV 键名 — 提示词块（单一 JSON 键存储全部块） */
+export const KV_PROMPT_BLOCKS_KEY = 'prompt_blocks';
+
+/** 旧 KV 键名（用于迁移） */
+const OLD_KV_KEYS = ['system_prompt', 'pre_prompt', 'post_prompt'] as const;
+
+/** 默认提示词块预设（2 个块，等价旧版 3 层提示词） */
+export const DEFAULT_PROMPT_BLOCKS: PromptBlock[] = [
+  {
+    id: 'sys-default',
+    name: '系统角色',
+    role: 'system',
+    content: `你是一个友好的 AI 邮件助手。请根据收到的邮件内容，生成简洁、专业、有帮助的回复。
 - 使用与发件人相同的语言回复
 - 保持回复简洁明了
 - 如果是问题，请直接回答
-- 署名使用 "AI Assistant"`;
+- 署名使用 "AI Assistant"`,
+    enabled: true,
+    sortOrder: 0,
+    mergeWithPrevious: true,
+  },
+  {
+    id: 'user-default',
+    name: '用户消息（含邮件）',
+    role: 'user',
+    content: `请根据以下邮件内容生成回复。
 
-/** 默认正文前提示词（当 KV 中无值时使用） */
-export const DEFAULT_PRE_PROMPT = '请根据以下邮件内容生成回复。';
+{{email_full}}
 
-/** 默认正文后提示词（当 KV 中无值时使用） */
-export const DEFAULT_POST_PROMPT = '请直接输出回复内容，不要包含邮件头信息（如 From、To、Subject 等）。';
+请直接输出回复内容，不要包含邮件头信息（如 From、To、Subject 等）。`,
+    enabled: true,
+    sortOrder: 10,
+    mergeWithPrevious: true,
+  },
+];
 
 /** 默认 AI 配置 */
 const DEFAULT_AI_BASE_URL = 'https://api.openai.com/v1';
@@ -123,25 +146,76 @@ export function getSenderInfo(env: Env): { email: string; name: string } {
 }
 
 /**
- * 从 KV 读取三层提示词，无值则 fallback 到默认值
+ * 从 KV 读取提示词块列表
  *
- * KV 键名:
- *   - system_prompt: AI 角色定义
- *   - pre_prompt:    正文前指令
- *   - post_prompt:   正文后指令
+ * 优先级:
+ *   1. 读取 KV 键 prompt_blocks（新格式，JSON 数组）
+ *   2. 若不存在，尝试从旧 3 键迁移（自动构建 2 个 PromptBlock 并写入新键，删除旧键）
+ *   3. 若旧键也不存在，返回 DEFAULT_PROMPT_BLOCKS
  */
-export async function readPrompts(env: Env): Promise<PromptConfig> {
+export async function readPrompts(env: Env): Promise<PromptBlock[]> {
+  // 1. 尝试读取新格式
+  const newData = await env.PROMPT_KV.get(KV_PROMPT_BLOCKS_KEY);
+  if (newData) {
+    try {
+      const blocks = JSON.parse(newData) as PromptBlock[];
+      if (Array.isArray(blocks) && blocks.length > 0) {
+        return blocks;
+      }
+    } catch {
+      console.warn('[CONFIG] prompt_blocks JSON 解析失败，将尝试迁移或使用默认值');
+    }
+  }
+
+  // 2. 尝试从旧 3 键迁移
   const [systemPrompt, prePrompt, postPrompt] = await Promise.all([
     env.PROMPT_KV.get('system_prompt'),
     env.PROMPT_KV.get('pre_prompt'),
     env.PROMPT_KV.get('post_prompt'),
   ]);
 
-  return {
-    systemPrompt: systemPrompt || DEFAULT_SYSTEM_PROMPT,
-    prePrompt: prePrompt || DEFAULT_PRE_PROMPT,
-    postPrompt: postPrompt || DEFAULT_POST_PROMPT,
-  };
+  if (systemPrompt || prePrompt || postPrompt) {
+    console.log('[CONFIG] 检测到旧格式提示词，执行自动迁移...');
+
+    const migratedBlocks: PromptBlock[] = [
+      {
+        id: 'sys-migrated',
+        name: '系统角色（已迁移）',
+        role: 'system',
+        content: systemPrompt || DEFAULT_PROMPT_BLOCKS[0].content,
+        enabled: true,
+        sortOrder: 0,
+        mergeWithPrevious: true,
+      },
+      {
+        id: 'user-migrated',
+        name: '用户消息（已迁移）',
+        role: 'user',
+        content: [
+          prePrompt || '',
+          '{{email_full}}',
+          postPrompt || '',
+        ].filter(Boolean).join('\n\n'),
+        enabled: true,
+        sortOrder: 10,
+        mergeWithPrevious: true,
+      },
+    ];
+
+    // 写入新格式
+    await env.PROMPT_KV.put(KV_PROMPT_BLOCKS_KEY, JSON.stringify(migratedBlocks));
+    console.log('[CONFIG] 迁移完成，已写入 prompt_blocks');
+
+    // 删除旧键
+    await Promise.all(OLD_KV_KEYS.map((key) => env.PROMPT_KV.delete(key)));
+    console.log('[CONFIG] 旧键已删除:', OLD_KV_KEYS.join(', '));
+
+    return migratedBlocks;
+  }
+
+  // 3. 返回默认预设
+  console.log('[CONFIG] 无 KV 数据，使用默认提示词块');
+  return [...DEFAULT_PROMPT_BLOCKS];
 }
 
 /**
